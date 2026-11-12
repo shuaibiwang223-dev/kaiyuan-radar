@@ -244,6 +244,7 @@ async function detail(id, list = []) {
       </div>
       ${chart}
       <p class="note">编程语言：${esc(r.l)} · 分叉数：${fmt(r.f)}<br>开源许可：${esc(license(r.lic))}（商用前请看清条款）<br>项目创建：${date(r.cr)} · 最近提交代码：${date(r.pu)}<br>来源：${esc(r.src || '')} · 加入监测：${time(r.di)} · 数据更新：${time(r.u)}${r.err ? '<br><span class="error">' + esc(r.err) + '</span>' : ''}</p>
+      ${r.err ? '<div class="notice">⚠️ 最近一次查询时 GitHub 上已经找不到这个项目，可能被作者删除、被 GitHub 封禁或改成了私有，下面的链接可能打不开。</div>' : ''}
       <div class="links"><button class="save-big" id="save-detail">${saved.some(s => s.n === r.n) ? '★ 已收藏' : '☆ 收藏'}</button><a href="${translate(r.n)}" target="_blank" rel="noopener">中文阅读全文 ↗</a><a href="https://github.com/${esc(r.n)}" target="_blank" rel="noopener">打开原项目 ↗</a></div>`;
     $('#save-detail').onclick = () => { const on = toggleSave(r); $('#save-detail').textContent = on ? '★ 已收藏' : '☆ 收藏'; };
   } catch (e) { $('#detail-body').innerHTML = '<div class="panel error">读取失败：' + esc(e.message) + '</div>'; }

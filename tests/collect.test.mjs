@@ -92,6 +92,10 @@ test('连续 8 天每小时运行：核心项目全覆盖、新星每小时刷�
   await buildSite(dir, out);
   const rank = JSON.parse(await readFile(join(out, 'data/rank/surge.json'), 'utf8'));
   assert.ok(rank.all.length > 0 && rank.all.every(id => rank.cards[id].s < 5000 || rank.cards[id].cr > '2026-08'), '急剧上涨榜只有还没大火的项目');
+  for (const f of ['d1', 'd7', 'stars', 'surge']) {
+    const rk = JSON.parse(await readFile(join(out, `data/rank/${f}.json`), 'utf8'));
+    assert.ok(Object.values(rk.cards).every(c => !st.repos[c.id]?.error), '排行榜里没有查不到的项目');
+  }
   const d180 = JSON.parse(await readFile(join(out, 'data/rank/d180.json'), 'utf8'));
   assert.ok(d180.all.length > 0);
   const search = JSON.parse(await readFile(join(out, 'data/search.json'), 'utf8'));

@@ -44,7 +44,8 @@ export async function buildSite(stateDir, out, webDir = 'web') {
 
   // 排行榜
   for (const [name, rule] of Object.entries(RANKS)) {
-    const list = all.filter(r => rule.key(r) != null && (!rule.filter || rule.filter(r, now))).sort((a, b) => rule.key(b) - rule.key(a) || b.stars - a.stars);
+    // 查不到的项目（被删除、封禁或改为私有）立刻从排行榜拿掉
+    const list = all.filter(r => !r.error && rule.key(r) != null && (!rule.filter || rule.filter(r, now))).sort((a, b) => rule.key(b) - rule.key(a) || b.stars - a.stars);
     const cards = {}, pick = arr => arr.map(r => (cards[r.id] = card(r), r.id));
     const cats = {};
     for (const c of CATEGORY_NAMES) cats[c] = pick(list.filter(r => r.category === c).slice(0, TOP_CAT));
