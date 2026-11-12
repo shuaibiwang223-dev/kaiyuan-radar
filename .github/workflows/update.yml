@@ -1,0 +1,77 @@
+name: 每 3 小时更新数据
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'   # 每 3 小时一次（UTC 时间每天 0:17、3:17、6:17 …）
+  workflow_dispatch:          # 也可以在 Actions 页面手动点“Run workflow”立即更新
+
+permissions:
+  contents: write   # 把数据存到 data 分支
+  pages: write      # 发布网站
+  id-token: write   # 发布网站需要
+  actions: write    # 让定时任务保持开启
+
+concurrency:
+  group: radar-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 取出上次的数据
+        run: |
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch --depth=1 origin data
+            git worktree add --detach state FETCH_HEAD
+          else
+            echo "第一次运行，从零开始"
+            mkdir state
+          fi
+
+      - name: 采集 GitHub 数据
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node collector/collect.mjs state
+
+      - name: 保存数据到 data 分支（只保留最新一份，仓库不会越来越大）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd state
+          [ -e .git ] || git init -q
+          git add -A
+          export GIT_AUTHOR_NAME="开源雷达" GIT_AUTHOR_EMAIL="actions@users.noreply.github.com"
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          commit=$(git commit-tree "$(git write-tree)" -m "数据更新 $(date -u +%F' '%H:%M) UTC")
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$commit:refs/heads/data"
+
+      - name: 生成网站
+        run: node scripts/build-site.mjs state _site
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: 防止定时任务因长期无人操作被 GitHub 自动停用
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update.yml/enable" || true

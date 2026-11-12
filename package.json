@@ -1,0 +1,1 @@
+{"name":"kaiyuan-radar","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","collect":"node collector/collect.mjs state","site":"node scripts/build-site.mjs state _site"}}
