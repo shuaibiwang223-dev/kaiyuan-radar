@@ -124,6 +124,13 @@ test('全量扫描超时会停下，下次接着扫', async () => {
   assert.match(run.notes.join(), /超时/);
   const st = await loadState(dir);
   assert.equal(st.meta.lastFull, undefined);
+  assert.ok(st.meta.sweepQueue.length > 0, '记下了没扫完的分段');
+  const run2 = await collect(dir, opts(fakeGitHub(), START + HOUR));
+  assert.match(run2.notes.join(), /接着上次/);
+  const st2 = await loadState(dir);
+  assert.equal(st2.meta.sweepQueue.length, 0, '第二次把剩下的扫完');
+  assert.equal(st2.meta.lastFull, START + HOUR);
+  assert.equal(Object.values(st2.repos).filter(r => r.pool === 'A' && r.id < 90000).length, 2999, '两次合起来一个不漏');
   await rm(dir, { recursive: true });
 });
 

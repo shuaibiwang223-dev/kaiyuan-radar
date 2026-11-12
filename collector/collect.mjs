@@ -40,7 +40,7 @@ export async function saveState(dir, s) {
 export async function collect(dir, {
   fetch = globalThis.fetch, now = Date.now(), token = process.env.GITHUB_TOKEN, full: forceFull = false,
   sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now, log = console.log,
-  searchGap = 2100, budgetMs = 40 * 60000,
+  searchGap = 2050, budgetMs = 46 * 60000,
 } = {}) {
   if (!token) throw Error('缺少 GITHUB_TOKEN：GitHub 的批量查询接口必须登录才能用。');
   await mkdir(dir, { recursive: true });
@@ -89,7 +89,9 @@ export async function collect(dir, {
   // 1. 全量扫描：全站 1000 星以上
   let sweepDone = false;
   if (isFull) {
-    const queue = (meta.ranges?.length ? meta.ranges : [[CORE_MIN_STARS, null]]).map(r => [r[0], r[1] ?? Infinity]);
+    // 上次没扫完就接着扫剩下的分段，否则从头扫一遍
+    const resume = meta.sweepQueue?.length > 0;
+    const queue = (resume ? meta.sweepQueue : meta.ranges?.length ? meta.ranges : [[CORE_MIN_STARS, null]]).map(r => [r[0], r[1] ?? Infinity]);
     const done = [], counts = [];
     let requests = 0;
     try {
@@ -110,9 +112,13 @@ export async function collect(dir, {
       }
       sweepDone = !queue.length;
     } catch (e) { errors.push('全量扫描中断：' + e.message); }
-    const all = [...done.map((r, i) => ({ r, n: counts[i] })), ...queue.map(r => ({ r, n: undefined }))].sort((a, b) => a.r[0] - b.r[0]);
-    meta.ranges = mergeRanges(all.map(x => x.r), all.map(x => x.n)).map(r => [r[0], r[1] === Infinity ? null : r[1]]);
-    notes.push(`全量扫描：${requests} 次查询，${meta.ranges.length} 个分段` + (sweepDone ? '' : '（未完成）'));
+    const store = r => [r[0], r[1] === Infinity ? null : r[1]];
+    if (!resume) {
+      const all = [...done.map((r, i) => ({ r, n: counts[i] })), ...queue.map(r => ({ r, n: undefined }))].sort((a, b) => a.r[0] - b.r[0]);
+      meta.ranges = mergeRanges(all.map(x => x.r), all.map(x => x.n)).map(store);
+    }
+    meta.sweepQueue = queue.map(store);
+    notes.push(`全量扫描${resume ? '（接着上次）' : ''}：${requests} 次查询，${done.length} 个分段` + (sweepDone ? '' : `，剩 ${queue.length} 段下次接着扫`));
     if (sweepDone) meta.lastFull = now;
   }
 
