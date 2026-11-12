@@ -1,12 +1,17 @@
-name: 每 3 小时更新数据
+name: 每小时更新数据
 
 on:
   schedule:
-    - cron: '17 */3 * * *'   # 每 3 小时一次（UTC 时间每天 0:17、3:17、6:17 …）
+    - cron: '17 * * * *'      # 每小时一次（每 3 小时其中一次是全站扫描，程序自己判断）
   workflow_dispatch:          # 也可以在 Actions 页面手动点“Run workflow”立即更新
+    inputs:
+      full:
+        description: '立即做一次全站扫描'
+        type: boolean
+        default: false
 
 permissions:
-  contents: write   # 把数据存到 data 分支
+  contents: write   # 把数据存到 Release
   pages: write      # 发布网站
   id-token: write   # 发布网站需要
   actions: write    # 让定时任务保持开启
@@ -18,10 +23,13 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STORE: data-store
     steps:
       - uses: actions/checkout@v4
 
@@ -31,38 +39,29 @@ jobs:
 
       - name: 取出上次的数据
         run: |
-          if git ls-remote --exit-code --heads origin data >/dev/null; then
-            git fetch --depth=1 origin data
-            git worktree add --detach state FETCH_HEAD
+          mkdir -p state
+          if gh release view "$STORE" >/dev/null 2>&1; then
+            gh release download "$STORE" -p state.json.gz -D state   # 下载失败会直接报错停止，不会用空数据覆盖
+            cp state/state.json.gz state-prev.json.gz                  # 留一份上次的数据当备份
           else
             echo "第一次运行，从零开始"
-            mkdir state
           fi
 
       - name: 采集 GitHub 数据
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node collector/collect.mjs state
+        run: node collector/collect.mjs state ${{ inputs.full && '--full' || '' }}
 
-      - name: 保存数据到 data 分支（只保留最新一份，仓库不会越来越大）
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: 保存数据（存到 Release，仓库不会越来越大）
         run: |
-          cd state
-          [ -e .git ] || git init -q
-          git add -A
-          export GIT_AUTHOR_NAME="开源雷达" GIT_AUTHOR_EMAIL="actions@users.noreply.github.com"
-          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
-          commit=$(git commit-tree "$(git write-tree)" -m "数据更新 $(date -u +%F' '%H:%M) UTC")
-          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$commit:refs/heads/data"
+          gh release view "$STORE" >/dev/null 2>&1 || gh release create "$STORE" --title "数据存储（自动生成，请勿删除）" --notes "开源雷达的采集数据，每小时自动更新。删除会丢失全部历史。" --latest=false
+          gh release upload "$STORE" state/state.json.gz --clobber
+          [ -f state-prev.json.gz ] && gh release upload "$STORE" state-prev.json.gz --clobber || true
 
       - name: 生成网站
         run: node scripts/build-site.mjs state _site
 
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-        continue-on-error: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -72,6 +71,4 @@ jobs:
         uses: actions/deploy-pages@v4
 
       - name: 防止定时任务因长期无人操作被 GitHub 自动停用
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update.yml/enable" || true

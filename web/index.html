@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#7561d6">
-<meta name="description" content="开源雷达：每 3 小时自动更新的 GitHub 开源项目涨星观察，全中文界面，手机直接看。">
+<meta name="description" content="开源雷达：全站 1000 星以上的 GitHub 项目涨星排行，新星项目每小时刷新，全中文界面。">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
 <link rel="stylesheet" href="style.css">
@@ -13,33 +13,34 @@
 <body>
 <header>
   <a href="./" class="brand"><span>✳</span>开源雷达<small>GitHub 涨星观察</small></a>
+  <form id="top-search" class="top-search" role="search"><input id="q" placeholder="搜索全站项目名，比如 n8n、ollama" aria-label="搜索项目"><button>搜索</button></form>
   <span class="live" id="live">● 读取中</span>
 </header>
 <div class="layout">
-  <aside>
-    <p>功能菜单</p>
+  <aside class="nav">
     <nav>
-      <button data-view="explore" class="active">◫ <span>发现项目</span></button>
+      <button data-view="rank" class="active">▤ <span>涨星排行</span></button>
+      <button data-view="surge">🚀 <span>急剧上涨</span></button>
       <button data-view="trending">↗ <span>热门榜</span></button>
       <button data-view="changes">⌁ <span>涨星变化</span></button>
       <button data-view="saved">☆ <span>我的收藏</span></button>
       <button data-view="about">ⓘ <span>使用说明</span></button>
     </nav>
-    <div class="side-note">每 3 小时自动更新<br>不只看暴涨<br>也看稳定增长和掉星</div>
+    <div class="side-note" id="side-note"></div>
   </aside>
   <main>
     <section class="hero">
       <div>
-        <h1 id="title">好项目，不应该被埋没。</h1>
-        <p id="subtitle">每 3 小时自动查一遍，看看哪些开源项目正在变热。</p>
+        <h1 id="title">涨星排行</h1>
+        <p id="subtitle"></p>
       </div>
       <button id="refresh" class="secondary" aria-label="重新读取数据">↻ 重新读取</button>
     </section>
     <div id="stats" class="stats"></div>
-    <div class="notice" id="scope">正在读取数据…</div>
     <section id="content"></section>
     <footer>数据来自 GitHub 公开信息 · 每个数字都标有采集时间<br>浏览不用登录 · 收藏只保存在当前手机或电脑上</footer>
   </main>
+  <aside class="rail" id="rail"></aside>
 </div>
 <dialog id="detail"><button class="close" aria-label="关闭">×</button><div id="detail-body"></div></dialog>
 <div id="toast" role="status"></div>
