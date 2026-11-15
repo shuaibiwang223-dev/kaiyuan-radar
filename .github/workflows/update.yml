@@ -23,7 +23,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 110
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -60,6 +60,37 @@ jobs:
 
       - name: 生成网站
         run: node scripts/build-site.mjs state _site
+
+      # ---------- 技能雷达（网站的 /skills/ 页面）。这几步出错不会影响开源雷达本身 ----------
+      - name: 技能雷达：取出上次的数据
+        continue-on-error: true
+        run: |
+          mkdir -p skills-state
+          gh release download "$STORE" -p skills-data.json -p skills-hist.json.gz -D skills-state || echo "技能雷达第一次运行，还没有旧数据"
+
+      - name: 技能雷达：采集（数据超过 6 小时才重新采，一次约 15 分钟）
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          cd skills-state
+          if python3 -c "import json,datetime,sys; at=json.load(open('skills-data.json'))['at']; t=datetime.datetime.strptime(at,'%Y-%m-%dT%H:%MZ').replace(tzinfo=datetime.timezone.utc); sys.exit(0 if (datetime.datetime.now(datetime.timezone.utc)-t).total_seconds()<5.6*3600 else 1)" 2>/dev/null; then
+            echo "数据还新，这次不采集"
+          else
+            bash ../skill-radar/collect.sh
+            python3 ../skill-radar/build.py
+            gh release upload "$STORE" skills-data.json skills-hist.json.gz --clobber
+          fi
+
+      - name: 技能雷达：放进网站
+        continue-on-error: true
+        run: |
+          if [ -f skills-state/skills-data.json ]; then
+            mkdir -p _site/skills
+            cp skill-radar/index.html _site/skills/index.html
+            cp skills-state/skills-data.json _site/skills/data.json
+          else
+            echo "还没有技能雷达数据，这次先不发布 /skills/ 页面"
+          fi
 
       - uses: actions/configure-pages@v5
 

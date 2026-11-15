@@ -54,3 +54,11 @@ web/                   网页（index.html、app.js、style.css、zh.js）
 .github/workflows/update.yml  定时任务
 tests/                 自动测试：npm test
 ```
+
+## 技能雷达（/skills/）
+
+同一个网站下的第二个页面，网址是在开源雷达网址后面加 `skills/`。它自动采集 GitHub 上各领域的 Agent Skill 仓库，按涨星速度排出爆款榜。
+
+- 代码在 `skill-radar/` 文件夹：`collect.sh` 负责搜索，`build.py` 负责分类和计算，`index.html` 是页面
+- 数据每 6 小时左右自动更新一次，和开源雷达共用同一个定时任务，数据同样存在 Release 里
+- 想加采集关键词：改 `skill-radar/collect.sh`；想改分类规则：改 `skill-radar/build.py` 里的 `CATS`
